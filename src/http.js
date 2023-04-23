@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import request from "request";
 import { performance } from "perf_hooks";
+import { fail } from "assert";
 
 class http {
 
@@ -16,7 +17,7 @@ class http {
     this._requests = requests;
   }
 
-  async responses() {
+  async #responses() {
     let responses = [];
     for (let i = 0; i < this._results.length; i++) {
       const resp = await Promise.all(this._results[i]);
@@ -25,7 +26,7 @@ class http {
     this._responses = responses;
   }
 
-  async concurrent() {
+  async #concurrent() {
     let results = [];
     for (var i = 0; i < this._requests.length; i++) {
       const result = new Promise((resolve, reject) => {
@@ -49,9 +50,9 @@ class http {
     this._results.push(results);
   }
 
-  async parallel() {
+  async #parallel() {
     for (var i = 0; i < this._options.vus; i++) {
-      this.concurrent();
+      this.#concurrent();
     }
   }
 
@@ -60,16 +61,17 @@ class http {
     let end = performance.now() + this._options.duration * 1000;
     while (performance.now() < end) {
       for (var i = 0; i < this._options.ips; i++) {
-        this.parallel();
+        this.#parallel();
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
       process.stdout.write("|");
     }
     process.stdout.write(chalk.greenBright("...COMPLETE!"));
-    await this.report();
+    await this.#getTestResults()
+    await this.#report();
   }
 
-  async averageResonseTime() {
+  async #averageResonseTime() {
     let sum = 0;
     for (var k = 0; k < this._response_times.length; k++) {
       sum = sum + this._response_times[k];
@@ -78,7 +80,7 @@ class http {
     this._average_response_time = Math.round(average);
   }
 
-  async ninetiethPercentileAndOtherMetrics() {
+  async #ninetiethPercentileAndOtherMetrics() {
     let index = Math.round(this._response_times.length * 0.9);
     let indexTwo = Math.round(this._response_times.length * 0.95);
     let array = this._response_times;
@@ -97,17 +99,41 @@ class http {
     }
   }
 
-  async report() {
-    await this.responses();
+  async #errorAndSuccessRates() {
+    let successfuls = 0;
+    let failures = 0;
+    for (let i = 0; i < this._response_codes.length; i++) {
+      if ((this._response_codes[i] >= 100 && this._response_codes[i] <= 102) || (this._response_codes[i] >= 200 && this._response_codes[i] <= 208) || (this._response_codes[i] >= 300 && this._response_codes[i] <= 308)) {
+        successfuls++;
+      } else {
+        failures++;
+      }
+    }
+    this._successful_requests = successfuls;
+    this._failed_requests = failures;
+    this._total_requests = successfuls + failures;
+    this._successful_requests_percentage = Math.round(100-(successfuls / this._total_requests));
+    this._failed_requests_percentage = (100 - this._successful_requests_percentage);
+  }
+
+  async #getTestResults() {
+    await this.#responses();
     let responseTimes = [];
+    let responseCodes = [];
     for (var i = 0; i < this._responses.length; i++) {
       for (var j = 0; j < this._responses[i].length; j++) {
         responseTimes.push(this._responses[i][j].elapsedTime);
+        responseCodes.push(this._responses[i][j].statusCode);
       }
     }
     this._response_times = responseTimes;
-    await this.averageResonseTime();
-    await this.ninetiethPercentileAndOtherMetrics();
+    this._response_codes = responseCodes;
+    await this.#averageResonseTime();
+    await this.#ninetiethPercentileAndOtherMetrics();
+    await this.#errorAndSuccessRates();
+  }
+
+  async #report() {
     console.log(chalk.cyanBright(`\n\nvus................: ${this._options.vus}`));
     console.log(chalk.cyanBright(`duration...........: ${this._options.duration}s`));
     console.log(
@@ -133,6 +159,16 @@ class http {
           this._options.vus *
           this._requests.length
         }`
+      )
+    );
+    console.log(
+      chalk.cyanBright(
+        `requests_failed......: ${this._failed_requests}❌    ${this._failed_requests_percentage}%`
+      )
+    );
+    console.log(
+      chalk.cyanBright(
+        `requests_suceeded......: ${this._successful_requests}✅    ${this._successful_requests_percentage}%`
       )
     );
     console.log(
