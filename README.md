@@ -19,11 +19,13 @@ The main features of this toolkit are as follows:
 Capture backend performance metrics:
   - Request Rate (throughput)
   - Error Percentage
-  - Response Times (average, median, 90th %, 95th %, 99th %)
+  - Response Times (average, minimum, median, maximum, 90th %, 95th %)
   - Test Duration
   - Total Request Count
   - Iterations
   - Iteration Rate (another throughput metric)
+  - Virtual Users
+  - Custom Trends and Thresholds
 
 Capture frontend page load metrics like:
   - First Paint
