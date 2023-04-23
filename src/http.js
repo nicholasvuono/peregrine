@@ -75,7 +75,7 @@ class http {
       sum = sum + this._response_times[k];
     }
     let average = sum / this._response_times.length;
-    this._average_response_time = average;
+    this._average_response_time = Math.round(average);
   }
 
   async ninetiethPercentileAndOtherMetrics() {
